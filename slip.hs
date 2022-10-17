@@ -195,14 +195,34 @@ s2l :: Sexp -> Lexp
 s2l (Snum n) = Lnum n
 s2l (Ssym "nil") = Lnil
 s2l (Ssym s) = Lref s
-s2l (Scons (Ssym "lambda") (Scons(Ssym s) (Scons a Snil))) = Llambda s (s2l a)
-s2l (Scons (Ssym "call") (Scons s (Scons a Snil))) = Lcall (s2l s) (s2l a)
-s2l (Scons (Ssym "add") (Scons s (Scons a Snil))) = Ladd (s2l s) (s2l a)
-s2l (Scons (Ssym "match") (Scons exp1 (Scons (Ssym var1) (Scons (Ssym var2) (Scons exp2 (Scons exp3 Snil)))))) = Lmatch (s2l exp1) var1 var2 (s2l exp2) (s2l exp3)
-s2l (Scons (Ssym "fix") (Scons (Ssym "[") (Scons (Ssym var1) (Scons exp1 (Scons (Ssym "]") (Scons exp2 Snil)))))) = Lfix [(var1, s2l exp1)] (s2l exp2)
+s2l (Scons (Ssym "lambda") 
+        (Scons(Ssym s) 
+            (Scons a Snil))) 
+    = Llambda s (s2l a)
+s2l (Scons (Ssym "call") 
+        (Scons s 
+            (Scons a Snil))) 
+    = Lcall (s2l s) (s2l a)
+s2l (Scons (Ssym "add") 
+        (Scons s 
+            (Scons a Snil))) 
+    = Ladd (s2l s) (s2l a)
+s2l (Scons (Ssym "match") 
+        (Scons exp1 
+            (Scons (Ssym var1) 
+                (Scons (Ssym var2) 
+                    (Scons exp2 
+                        (Scons exp3 Snil)))))) 
+    = Lmatch (s2l exp1) var1 var2 (s2l exp2) (s2l exp3)
+s2l (Scons (Ssym "fix") 
+        (Scons (Ssym "[") 
+            (Scons (Ssym var1) 
+                (Scons exp1 
+                    (Scons (Ssym "]") 
+                        (Scons exp2 Snil)))))) 
+    = Lfix [(var1, s2l exp1)] (s2l exp2)
 s2l (Scons a Snil) = s2l a
 s2l (Scons a b) = Ladd (s2l a) (s2l b)
--- ¡¡ COMPLETER !!
 s2l se = error ("Malformed Sexp: " ++ (showSexp se))
 
 ---------------------------------------------------------------------------
