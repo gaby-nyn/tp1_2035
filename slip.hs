@@ -11,23 +11,27 @@
 -- Importations de librairies et définitions de fonctions auxiliaires    --
 ---------------------------------------------------------------------------
 
-import Text.ParserCombinators.Parsec -- Librairie d'analyse syntaxique.
-import Data.Char        -- Conversion de Chars de/vers Int et autres
+-- Librairie d'analyse syntaxique.
+import Data.Char -- Conversion de Chars de/vers Int et autres
 -- import Numeric       -- Pour la fonction showInt
-import System.IO        -- Pour stdout, hPutStr
+-- Pour stdout, hPutStr
 import Distribution.Simple.Program.HcPkg (list)
+import System.IO
+import Text.ParserCombinators.Parsec
+
 -- import Data.Maybe    -- Pour isJust and fromJust
 
 ---------------------------------------------------------------------------
 -- La représentation interne des expressions de notre language           --
 ---------------------------------------------------------------------------
-data Sexp = Snil                        -- La liste vide
-          | Scons Sexp Sexp             -- Une paire
-          | Ssym String                 -- Un symbole
-          | Snum Int                    -- Un entier
-          -- Génère automatiquement un pretty-printer et une fonction de
-          -- comparaison structurelle.
-          deriving (Show, Eq)
+data Sexp
+  = Snil -- La liste vide
+  | Scons Sexp Sexp -- Une paire
+  | Ssym String -- Un symbole
+  | Snum Int -- Un entier
+  -- Génère automatiquement un pretty-printer et une fonction de
+  -- comparaison structurelle.
+  deriving (Show, Eq)
 
 -- Exemples:
 -- (+ 2 3) == (+ . (2 . (3 . ())))
@@ -50,42 +54,55 @@ data Sexp = Snil                        -- La liste vide
 ---------------------------------------------------------------------------
 
 pChar :: Char -> Parser ()
-pChar c = do { _ <- char c; return () }
+pChar c = do _ <- char c; return ()
 
 -- Les commentaires commencent par un point-virgule et se terminent
 -- à la fin de la ligne.
 pComment :: Parser ()
-pComment = do { pChar ';'; _ <- many (satisfy (\c -> not (c == '\n')));
-                (pChar '\n' <|> eof); return ()
-              }
+pComment = do
+  pChar ';'
+  _ <- many (satisfy (\c -> not (c == '\n')))
+  (pChar '\n' <|> eof)
+  return ()
+
 -- N'importe quelle combinaison d'espaces et de commentaires est considérée
 -- comme du blanc.
 pSpaces :: Parser ()
-pSpaces = do { _ <- many (do { _ <- space ; return () } <|> pComment);
-               return () }
+pSpaces = do
+  _ <- many (do { _ <- space; return () } <|> pComment)
+  return ()
 
 -- Un nombre entier est composé de chiffres.
-integer     :: Parser Int
-integer = do c <- digit
-             integer' (digitToInt c)
-          <|> do _ <- satisfy (\c -> (c == '-'))
-                 n <- integer
-                 return (- n)
-    where integer' :: Int -> Parser Int
-          integer' n = do c <- digit
-                          integer' (10 * n + (digitToInt c))
-                       <|> return n
+integer :: Parser Int
+integer =
+  do
+    c <- digit
+    integer' (digitToInt c)
+    <|> do
+      _ <- satisfy (\c -> (c == '-'))
+      n <- integer
+      return (- n)
+  where
+    integer' :: Int -> Parser Int
+    integer' n =
+      do
+        c <- digit
+        integer' (10 * n + (digitToInt c))
+        <|> return n
 
 -- Les symboles sont constitués de caractères alphanumériques et de signes
 -- de ponctuations.
 pSymchar :: Parser Char
-pSymchar    = alphaNum <|> satisfy (\c -> c `elem` "!@$%^&*_+-=:|/?<>")
+pSymchar = alphaNum <|> satisfy (\c -> c `elem` "!@$%^&*_+-=:|/?<>")
+
 pSymbol :: Parser Sexp
-pSymbol= do { s <- many1 (pSymchar);
-              return (case parse integer "" s of
-                        Right n -> Snum n
-                        _ -> Ssym s)
-            }
+pSymbol = do
+  s <- many1 (pSymchar)
+  return
+    ( case parse integer "" s of
+        Right n -> Snum n
+        _ -> Ssym s
+    )
 
 ---------------------------------------------------------------------------
 -- Analyseur syntaxique                                                  --
@@ -93,33 +110,42 @@ pSymbol= do { s <- many1 (pSymchar);
 
 -- La notation "'E" est équivalente à "(quote E)"
 pQuote :: Parser Sexp
-pQuote = do { pChar '\''; pSpaces; e <- pSexp;
-              return (Scons (Ssym "quote") (Scons e Snil)) }
+pQuote = do
+  pChar '\''
+  pSpaces
+  e <- pSexp
+  return (Scons (Ssym "quote") (Scons e Snil))
 
 -- Une liste est de la forme:  ( {e} [. e] )
 pList :: Parser Sexp
-pList  = do { pChar '('; pSpaces; pTail }
+pList = do pChar '('; pSpaces; pTail
+
 pTail :: Parser Sexp
-pTail  = do { pChar ')'; return Snil }
-     <|> do { pChar '.'; pSpaces; e <- pSexp; pSpaces;
-              pChar ')' <|> error ("Missing ')' after: " ++ show e);
-              return e }
-     <|> do { e <- pSexp; pSpaces; es <- pTail; return (Scons e es) }
+pTail =
+  do pChar ')'; return Snil
+    <|> do
+      pChar '.'
+      pSpaces
+      e <- pSexp
+      pSpaces
+      pChar ')' <|> error ("Missing ')' after: " ++ show e)
+      return e
+    <|> do e <- pSexp; pSpaces; es <- pTail; return (Scons e es)
 
 -- Accepte n'importe quel caractère: utilisé en cas d'erreur.
 pAny :: Parser (Maybe Char)
-pAny = do { c <- anyChar ; return (Just c) } <|> return Nothing
+pAny = do { c <- anyChar; return (Just c) } <|> return Nothing
 
 -- Une Sexp peut-être une liste, un symbol ou un entier.
 pSexpTop :: Parser Sexp
-pSexpTop = do { pSpaces;
-                pList <|> pQuote <|> pSymbol
-                <|> do { x <- pAny;
-                         case x of
-                           Nothing -> pzero
-                           Just c -> error ("Unexpected char '" ++ [c] ++ "'")
-                       }
-              }
+pSexpTop = do
+  pSpaces
+  pList <|> pQuote <|> pSymbol
+    <|> do
+      x <- pAny
+      case x of
+        Nothing -> pzero
+        Just c -> error ("Unexpected char '" ++ [c] ++ "'")
 
 -- On distingue l'analyse syntaxique d'une Sexp principale de celle d'une
 -- sous-Sexp: si l'analyse d'une sous-Sexp échoue à EOF, c'est une erreur de
@@ -130,17 +156,21 @@ pSexp = pSexpTop <|> error "Unexpected end of stream"
 
 -- Une séquence de Sexps.
 pSexps :: Parser [Sexp]
-pSexps = do pSpaces
-            many (do e <- pSexpTop
-                     pSpaces
-                     return e)
+pSexps = do
+  pSpaces
+  many
+    ( do
+        e <- pSexpTop
+        pSpaces
+        return e
+    )
 
 -- Déclare que notre analyseur syntaxique peut-être utilisé pour la fonction
 -- générique "read".
 instance Read Sexp where
-    readsPrec _p s = case parse pSexp "" s of
-                      Left _ -> []
-                      Right e -> [(e,"")]
+  readsPrec _p s = case parse pSexp "" s of
+    Left _ -> []
+    Right e -> [(e, "")]
 
 ---------------------------------------------------------------------------
 -- Sexp Pretty Printer                                                   --
@@ -151,11 +181,11 @@ showSexp' Snil = showString "()"
 showSexp' (Snum n) = showsPrec 0 n
 showSexp' (Ssym s) = showString s
 showSexp' (Scons e1 e2) =
-    let showTail Snil = showChar ')'
-        showTail (Scons e1' e2') =
-            showChar ' ' . showSexp' e1' . showTail e2'
-        showTail e = showString " . " . showSexp' e . showChar ')'
-    in showChar '(' . showSexp' e1 . showTail e2
+  let showTail Snil = showChar ')'
+      showTail (Scons e1' e2') =
+        showChar ' ' . showSexp' e1' . showTail e2'
+      showTail e = showString " . " . showSexp' e . showChar ')'
+   in showChar '(' . showSexp' e1 . showTail e2
 
 -- On peut utiliser notre pretty-printer pour la fonction générique "show"
 -- (utilisée par la boucle interactive de GHCi).  Mais avant de faire cela,
@@ -169,6 +199,7 @@ instance Show Sexp where
 -- de GHCi:
 readSexp :: String -> Sexp
 readSexp = read
+
 showSexp :: Sexp -> String
 showSexp e = showSexp' e ""
 
@@ -178,82 +209,174 @@ showSexp e = showSexp' e ""
 
 type Var = String
 
-data Lexp = Lnum Int            -- Constante entière.
-          | Lref Var            -- Référence à une variable.
-          | Llambda Var Lexp    -- Fonction anonyme prenant un argument.
-          | Lcall Lexp Lexp     -- Appel de fonction, avec un argument.
-          | Lnil                -- Constructeur de liste vide.
-          | Ladd Lexp Lexp      -- Constructeur de liste.
-          | Lmatch Lexp Var Var Lexp Lexp -- Expression conditionelle.
-          -- Déclaration d'une liste de variables qui peuvent être
-          -- mutuellement récursives.
-          | Lfix [(Var, Lexp)] Lexp
-          deriving (Show, Eq)
+data Lexp
+  = Lnum Int -- Constante entière.
+  | Lref Var -- Référence à une variable.
+  | Llambda Var Lexp -- Fonction anonyme prenant un argument.
+  | Lcall Lexp Lexp -- Appel de fonction, avec un argument.
+  | Lnil -- Constructeur de liste vide.
+  | Ladd Lexp Lexp -- Constructeur de liste.
+  | Lmatch Lexp Var Var Lexp Lexp -- Expression conditionelle.
+  -- Déclaration d'une liste de variables qui peuvent être
+  -- mutuellement récursives.
+  | Lfix [(Var, Lexp)] Lexp
+  deriving (Show, Eq)
 
 -- Première passe simple qui analyse un Sexp et construit une Lexp équivalente.
 s2l :: Sexp -> Lexp
 s2l (Snum n) = Lnum n
 s2l (Ssym "nil") = Lnil
-s2l (Ssym s) = Lref s
-s2l (Scons (Ssym "lambda") 
-        (Scons(Ssym s) 
-            (Scons a Snil))) 
-    = Llambda s (s2l a)
-s2l (Scons (Ssym "call") 
-        (Scons s 
-            (Scons a Snil))) 
-    = Lcall (s2l s) (s2l a)
-s2l (Scons (Ssym "add") 
-        (Scons s 
-            (Scons a Snil))) 
-    = Ladd (s2l s) (s2l a)
-s2l (Scons (Ssym "match") 
-        (Scons exp1 
-            (Scons (Ssym var1) 
-                (Scons (Ssym var2) 
-                    (Scons exp2 
-                        (Scons exp3 Snil)))))) 
-    = Lmatch (s2l exp1) var1 var2 (s2l exp2) (s2l exp3)
-s2l (Scons (Ssym "fix") 
-        (Scons (Ssym "[") 
-            (Scons (Ssym var1) 
-                (Scons exp1 
-                    (Scons (Ssym "]") 
-                        (Scons exp2 Snil)))))) 
-    = Lfix [(var1, s2l exp1)] (s2l exp2)
+s2l (Scons (Ssym "fn") (Scons (Scons (Ssym x) Snil) (Scons a Snil))) =
+  Llambda x (s2l a)
+s2l
+  ( Scons
+      ( Scons
+          f
+          ( Scons
+              x
+              (Scons y Snil)
+            )
+        )
+      ( Scons
+          ( Scons
+              a
+              ( Scons
+                  b
+                  (Scons c Snil)
+                )
+            )
+          Snil
+        )
+    ) =
+    Lcall
+      (Ladd (s2l f) (Ladd (s2l x) (s2l y)))
+      (Ladd (s2l a) (Ladd (s2l b) (s2l c)))
+s2l (Scons (Ssym "list") (Scons a Snil)) =
+  Ladd (s2l a) Lnil
+s2l
+  ( Scons
+      (Ssym "add")
+      ( Scons
+          s
+          (Scons a Snil)
+        )
+    ) =
+    Ladd (s2l s) (s2l a)
+s2l
+  ( Scons
+      (Ssym "match")
+      ( Scons
+          exp1
+          ( Scons
+              (Scons
+                (Ssym "nil")
+                (Scons
+                  exp3
+                  Snil
+                )
+              )
+              (Scons
+                (Scons
+                  (Scons
+                    (Ssym "add")
+                    (Scons
+                      (Ssym var1)
+                      (Scons
+                        (Ssym var2)
+                        Snil
+                      )
+                    )
+                  )
+                  exp2
+                )
+                Snil
+              )
+            )
+        )
+    ) =
+    Lmatch (s2l exp1) var1 var2 (s2l exp2) (s2l exp3)
+s2l (Scons
+      (Ssym "let")
+      (Scons
+        (Scons
+          (Scons
+            (Ssym x)
+            (Scons a Snil)
+          )
+          b
+        )
+        (Scons c Snil)
+      )
+    ) =
+  Lfix ((x, s2l a):findVarLexp b) (s2l c)
+s2l (Scons
+      (Ssym "let")
+      (Scons
+        (Scons
+          (Scons
+            a
+            (Scons b Snil)
+          )
+          Snil
+        )
+        (Scons c Snil)
+      )
+    ) =
+  Lfix (varLexpFinder a b) (s2l c)
 s2l (Scons a Snil) = s2l a
 s2l (Scons a b) = Ladd (s2l a) (s2l b)
-s2l se = error ("Malformed Sexp: " ++ (showSexp se))
+s2l (Ssym s) = Lref s
+s2l se = error ("Malformed Sexp: " ++ showSexp se)
+
+varLexpFinder :: Sexp -> Sexp -> [(Var, Lexp)]
+varLexpFinder Snil Snil = []
+varLexpFinder (Scons (Ssym x) Snil) b = [(x, s2l b)]
+varLexpFinder (Scons (Ssym x) b) (Scons c d) = (x, s2l c):varLexpFinder b d
+varLexpFinder _ _ = error "MalformedSexp"
+
+findVarLexp :: Sexp -> [(Var, Lexp)]
+findVarLexp Snil = []
+findVarLexp (Scons
+              (Scons
+                (Ssym x)
+                (Scons a Snil)
+              )
+              b
+            ) = (x, s2l a):findVarLexp b
+findVarLexp _ = error "MalformedSexp"
 
 ---------------------------------------------------------------------------
 -- Représentation du contexte d'exécution                                --
 ---------------------------------------------------------------------------
 
 -- Type des valeurs manipulée à l'exécution.
-data Value = Vnum Int
-           | Vnil
-           | Vcons Value Value
-           | Vfun (Value -> Value)
+data Value
+  = Vnum Int
+  | Vnil
+  | Vcons Value Value
+  | Vfun (Value -> Value)
 
 instance Show Value where
-    showsPrec p (Vnum n) = showsPrec p n
-    showsPrec _ Vnil = showString "[]"
-    showsPrec p (Vcons v1 v2) =
-        let showTail Vnil = showChar ']'
-            showTail (Vcons v1' v2') =
-                showChar ' ' . showsPrec p v1' . showTail v2'
-            showTail v = showString " . " . showsPrec p v . showChar ']'
-        in showChar '[' . showsPrec p v1 . showTail v2
-    showsPrec _ _ = showString "<function>"
+  showsPrec p (Vnum n) = showsPrec p n
+  showsPrec _ Vnil = showString "[]"
+  showsPrec p (Vcons v1 v2) =
+    let showTail Vnil = showChar ']'
+        showTail (Vcons v1' v2') =
+          showChar ' ' . showsPrec p v1' . showTail v2'
+        showTail v = showString " . " . showsPrec p v . showChar ']'
+     in showChar '[' . showsPrec p v1 . showTail v2
+  showsPrec _ _ = showString "<function>"
 
 type Env = [(Var, Value)]
 
 -- L'environnement initial qui contient les fonctions prédéfinies.
 env0 :: Env
-env0 = [("+", Vfun (\ (Vnum x) -> Vfun (\ (Vnum y) -> Vnum (x + y)))),
-        ("*", Vfun (\ (Vnum x) -> Vfun (\ (Vnum y) -> Vnum (x * y)))),
-        ("/", Vfun (\ (Vnum x) -> Vfun (\ (Vnum y) -> Vnum (x `div` y)))),
-        ("-", Vfun (\ (Vnum x) -> Vfun (\ (Vnum y) -> Vnum (x - y))))]
+env0 =
+  [ ("+", Vfun (\(Vnum x) -> Vfun (\(Vnum y) -> Vnum (x + y)))),
+    ("*", Vfun (\(Vnum x) -> Vfun (\(Vnum y) -> Vnum (x * y)))),
+    ("/", Vfun (\(Vnum x) -> Vfun (\(Vnum y) -> Vnum (x `div` y)))),
+    ("-", Vfun (\(Vnum x) -> Vfun (\(Vnum y) -> Vnum (x - y))))
+  ]
 
 ---------------------------------------------------------------------------
 -- Représentation intermédiaire Dexp                                     --
@@ -269,22 +392,66 @@ env0 = [("+", Vfun (\ (Vnum x) -> Vfun (\ (Vnum y) -> Vnum (x + y)))),
 
 type Idx = Int
 
-data Dexp = Dnum Int            -- Constante entière.
-          | Dref Idx            -- Référence à une variable.
-          | Dlambda Dexp        -- Fonction anonyme prenant un argument.
-          | Dcall Dexp Dexp     -- Appel de fonction, avec un argument.
-          | Dnil                -- Constructeur de liste vide.
-          | Dadd Dexp Dexp      -- Constructeur de liste.
-          | Dmatch Dexp Dexp Dexp -- Expression conditionelle.
-          -- Déclaration d'une liste de variables qui peuvent être
-          -- mutuellement récursives.
-          | Dfix [Dexp] Dexp
-          deriving (Show, Eq)
+data Dexp
+  = Dnum Int -- Constante entière.
+  | Dref Idx -- Référence à une variable.
+  | Dlambda Dexp -- Fonction anonyme prenant un argument.
+  | Dcall Dexp Dexp -- Appel de fonction, avec un argument.
+  | Dnil -- Constructeur de liste vide.
+  | Dadd Dexp Dexp -- Constructeur de liste.
+  | Dmatch Dexp Dexp Dexp -- Expression conditionelle.
+  -- Déclaration d'une liste de variables qui peuvent être
+  -- mutuellement récursives.
+  | Dfix [Dexp] Dexp
+  deriving (Show, Eq)
 
 -- Le premier argument contient la liste des variables du contexte.
 l2d :: [Var] -> Lexp -> Dexp
 l2d _ (Lnum n) = Dnum n
+l2d _ Lnil = Dnil
+l2d env (Lref x) = fctIndexer env 0 x
+l2d env (Llambda x a) = Dlambda (l2d (x:env) a)
+l2d env (Lcall fn arg) = Dcall (l2d env fn) (l2d env arg)
+l2d env (Ladd a b) = Dadd (l2d env a) (l2d env b)
+l2d env (Lmatch fi var1 var2 neth esle) =
+  Dmatch (l2d env fi) (l2d (var1 : (var2 : env)) neth) (l2d (var1 : (var2 : env)) esle)
+l2d env (Lfix [(x, a)] b) = Dfix [l2d env a] (l2d (x : env) b)
+l2d _ _ = error "Malformed Lexp"
+
+--Descendre (x:xs) récursivement jusqu'à la dernière variable
+--Faire un match pour trouver toutes les variables du même nom (Même niveau)
+--Remplacer par l'index n
+--Remonter d'un niveau et match avec la variable n+1
+
+fctIndexer :: [Var] -> Int -> Var -> Dexp
+fctIndexer [] _ _ = Dnil
+fctIndexer (x : xs) index var =
+  if x == var
+    then Dref index
+    else
+      let indexInc = index + 1
+       in fctIndexer xs indexInc var
+
 -- ¡¡ COMPLETER !!
+
+--fctIndexer aller chercher index dans la Lexp
+-- fctIndexer :: Lexp -> Int
+-- fctIndexer (Lnum n) = 0
+-- fctIndexer Lnil = 0
+-- fctIndexer (Lref x) = 0
+-- fctIndexer (Llambda x a) = 1 + fctIndexer a
+-- fctIndexer (Lcall s a) = fctIndexer s + fctIndexer a
+-- fctIndexer (Ladd a b) = fctIndexer a + fctIndexer b
+-- fctIndexer (Lmatch exp1 var1 var2 exp2 exp3) =
+--   2 + fctIndexer exp1 + fctIndexer exp2 + fctIndexer exp3
+-- fctIndexer (Lfix [(var1, exp1)] exp2) = 1 + fctIndexer exp1 + fctIndexer exp2
+
+-- fctIndexer :: Var -> Int -> (Lref -> Int -> Dexp) -> [] -> Dexp
+-- fctIndexer = map Lref2Dref
+
+--Nécessaire?
+-- lref2Dref :: Dexp -> Var -> Int -> Dexp
+-- lref2Dref (l2d (Lref a)) var x = if a == var then (Dref x) else (l2d (Lref a))
 
 ---------------------------------------------------------------------------
 -- Évaluateur                                                            --
@@ -294,8 +461,9 @@ l2d _ (Lnum n) = Dnum n
 -- dans le même ordre que ces variables ont été passées à `l2d`.
 eval :: [Value] -> Dexp -> Value
 eval _ (Dnum n) = Vnum n
+
 -- ¡¡ COMPLETER !!
-                  
+
 ---------------------------------------------------------------------------
 -- Toplevel                                                              --
 ---------------------------------------------------------------------------
@@ -307,12 +475,14 @@ evalSexp = eval (map snd env0) . l2d (map fst env0) . s2l
 -- l'autre, et renvoie la liste des valeurs obtenues.
 run :: FilePath -> IO ()
 run filename =
-    do s <- readFile filename
-       (hPutStr stdout . show)
-           (let sexps s' = case parse pSexps filename s' of
-                             Left _ -> [Ssym "#<parse-error>"]
-                             Right es -> es
-            in map evalSexp (sexps s))
+  do
+    s <- readFile filename
+    (hPutStr stdout . show)
+      ( let sexps s' = case parse pSexps filename s' of
+              Left _ -> [Ssym "#<parse-error>"]
+              Right es -> es
+         in map evalSexp (sexps s)
+      )
 
 sexpOf :: String -> Sexp
 sexpOf = read
