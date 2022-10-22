@@ -461,6 +461,29 @@ fctIndexer (x : xs) index var =
 -- dans le même ordre que ces variables ont été passées à `l2d`.
 eval :: [Value] -> Dexp -> Value
 eval _ (Dnum n) = Vnum n
+eval values (Dref a) = Vcons (getValue a 0 values) Vnil
+eval values (Dlambda a) = Vcons (eval values a) Vnil
+eval values (Dcall a b) = let x = eval values a in Vfun (\x -> eval values b)
+eval _ Dnil = Vnil
+eval values (Dadd a b) = Vcons (eval values a) (eval values b)
+--Paire (Value, (Value, Value)), if "first" then "second.first" else "second.second"
+eval values (Dmatch a b c) = Vcons(eval values a) (Vcons (eval values b) (eval values c))
+eval values (Dfix [Dnum _] (Dnum n)) = Vnum n
+eval values (Dfix [a] (Dref b)) = eval values (Dref b)
+eval values (Dfix[a] (Dlambda b)) = eval values (Dlambda b)
+eval values (Dfix[a] (Dcall b c)) = eval values (Dcall b c)
+-- eval values (Dfix [a] b) = Vcons (eval values a) (eval values b)
+eval values (Dfix[a] b) = eval values b
+-- eval [] (Dfix ((Dnum _):_:_) (Dnum _)) = Vnum _
+
+
+--TODO: Int or Maybe Int?
+getValue :: Int -> Int -> [Value] -> Value
+getValue _ _ [] = [] --TODO: How to return null
+getValue idx cntr (x : xs) =
+  if cntr == idx
+    then x
+    else let cntrInc = cntr + 1 in getValue idx cntrInc xs
 
 -- ¡¡ COMPLETER !!
 
