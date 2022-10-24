@@ -16,3 +16,4 @@ Problèmes eval:
 * `getValue :: Int -> Int -> [Int] -> Int` erreur quand on retourne `[]` ou `Nothing`
 * Incertitudes pour cas Dlambda et Dfix
 * `Dmatch a b c = Vcons a (Vcons b c)`?
+* Mauvaise signature de `getValue`, c'est plutôt `getValue :: Int -> Int -> [Value] -> Value` 
