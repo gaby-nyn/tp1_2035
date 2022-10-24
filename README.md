@@ -12,7 +12,7 @@ Problèmes l2d:
 
 Problèmes eval:
 * getValue retourner [], erreur de type
-* `getValue :: Int -> Int -> [Int] -> Maybe Int` erreur quand on retourne Int
-* `getValue :: Int -> Int -> [Int] -> Int` erreur quand on retourn []
+* `getValue :: Int -> Int -> [Int] -> Maybe Int` erreur quand on retourne Int, mais `Nothing` correct
+* `getValue :: Int -> Int -> [Int] -> Int` erreur quand on retourne `[]` ou `Nothing`
 * Incertitudes pour cas Dlambda et Dfix
 * `Dmatch a b c = Vcons a (Vcons b c)`?
