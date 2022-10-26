@@ -442,13 +442,9 @@ eval _ Dnil = Vnil
 eval values (Dadd a b) = Vcons (eval values a) (eval values b)
 --Paire (Value, (Value, Value)), if "first" then "second.first" else "second.second"
 eval values (Dmatch a b c) = Vcons(eval values a) (Vcons (eval values b) (eval values c))
-eval values (Dfix [Dnum _] (Dnum n)) = Vnum n
-eval values (Dfix [a] (Dref b)) = eval values (Dref b)
-eval values (Dfix[a] (Dlambda b)) = eval values (Dlambda b)
-eval values (Dfix[a] (Dcall b c)) = eval values (Dcall b c)
--- eval values (Dfix [a] b) = Vcons (eval values a) (eval values b)
-eval values (Dfix[a] b) = eval values b
+eval values (Dfix [a] b) = Vcons (eval values a) (eval values b)
 -- eval [] (Dfix ((Dnum _):_:_) (Dnum _)) = Vnum _
+eval _ _ = error "Malformed Dexp"
 
 
 --TODO: Int or Maybe Int?
