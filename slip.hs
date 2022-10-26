@@ -418,11 +418,6 @@ l2d env (Lmatch fi var1 var2 neth esle) =
 l2d env (Lfix [(x, a)] b) = Dfix [l2d env a] (l2d (x : env) b)
 l2d _ _ = error "Malformed Lexp"
 
---Descendre (x:xs) récursivement jusqu'à la dernière variable
---Faire un match pour trouver toutes les variables du même nom (Même niveau)
---Remplacer par l'index n
---Remonter d'un niveau et match avec la variable n+1
-
 fctIndexer :: [Var] -> Int -> Var -> Dexp
 fctIndexer [] _ _ = Dnil
 fctIndexer (x : xs) index var =
@@ -431,27 +426,6 @@ fctIndexer (x : xs) index var =
     else
       let indexInc = index + 1
        in fctIndexer xs indexInc var
-
--- ¡¡ COMPLETER !!
-
---fctIndexer aller chercher index dans la Lexp
--- fctIndexer :: Lexp -> Int
--- fctIndexer (Lnum n) = 0
--- fctIndexer Lnil = 0
--- fctIndexer (Lref x) = 0
--- fctIndexer (Llambda x a) = 1 + fctIndexer a
--- fctIndexer (Lcall s a) = fctIndexer s + fctIndexer a
--- fctIndexer (Ladd a b) = fctIndexer a + fctIndexer b
--- fctIndexer (Lmatch exp1 var1 var2 exp2 exp3) =
---   2 + fctIndexer exp1 + fctIndexer exp2 + fctIndexer exp3
--- fctIndexer (Lfix [(var1, exp1)] exp2) = 1 + fctIndexer exp1 + fctIndexer exp2
-
--- fctIndexer :: Var -> Int -> (Lref -> Int -> Dexp) -> [] -> Dexp
--- fctIndexer = map Lref2Dref
-
---Nécessaire?
--- lref2Dref :: Dexp -> Var -> Int -> Dexp
--- lref2Dref (l2d (Lref a)) var x = if a == var then (Dref x) else (l2d (Lref a))
 
 ---------------------------------------------------------------------------
 -- Évaluateur                                                            --
