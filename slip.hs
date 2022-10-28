@@ -453,7 +453,7 @@ eval values (Dcall a b) = let x = eval values a in Vfun (\x -> eval values b)
 eval _ Dnil = Vnil
 eval values (Dadd (Dref x) a) = let fun = \y -> getValue x 0 values in Vfun (fun a)
 eval values (Dadd a b) = Vcons (eval values a) (eval values b)
-eval values (Dmatch a b c) = 
+eval values (Dmatch a b c) =
   if eval values a
   then eval values b
   else eval values c
@@ -466,10 +466,6 @@ getValue idx cntr (x : xs) =
   if cntr == idx
     then x
     else let cntrInc = cntr + 1 in getValue idx cntrInc xs
-
-funcValue :: [Value] -> Dexp -> Dexp -> Value
--- funcValue values (Dref x) a = (getValue x 0 values) (eval values a)
-funcValue _ _  _= Vnil
 
 ---------------------------------------------------------------------------
 -- Toplevel                                                              --
