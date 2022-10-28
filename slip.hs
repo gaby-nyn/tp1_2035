@@ -355,6 +355,7 @@ data Value
   | Vnil
   | Vcons Value Value
   | Vfun (Value -> Value)
+  -- deriving (Eq)
 
 instance Show Value where
   showsPrec p (Vnum n) = showsPrec p n
@@ -413,9 +414,11 @@ l2d env (Lref x) = fctIndexer env 0 x
 l2d env (Llambda x a) = Dlambda (l2d (x:env) a)
 l2d env (Lcall fn arg) = Dcall (l2d env fn) (l2d env arg)
 l2d env (Ladd a b) = Dadd (l2d env a) (l2d env b)
-l2d env (Lmatch fi var1 var2 neth esle) =
-  Dmatch (l2d env fi) (l2d (var1 : (var2 : env)) neth) (l2d (var1 : (var2 : env)) esle)
-l2d env (Lfix ((x, a):xs) b) = Dfix (l2d env a : valFinder env xs) (l2d (varFinder xs ++ (x : env)) b)
+l2d env (Lmatch (Ladd a b) x y ec en) =
+  Dmatch (l2d env (Lfix [(x, a), (y, b)] ec))
+  (l2d env (Lfix [(x, a), (y, b)] ec)) (l2d env en)
+l2d env (Lfix ((x, a):xs) b) =
+  Dfix (l2d env a : valFinder env xs) (l2d (varFinder xs ++ (x : env)) b)
 l2d _ _ = error "Malformed Lexp"
 
 fctIndexer :: [Var] -> Int -> Var -> Dexp
@@ -448,12 +451,13 @@ eval values (Dref a) = getValue a 0 values
 eval values (Dlambda a) = Vfun (\x -> eval values a)
 eval values (Dcall a b) = let x = eval values a in Vfun (\x -> eval values b)
 eval _ Dnil = Vnil
--- eval values (Dadd (Dref x) a) = let fun = \y -> getValue x 0 values in Vfun (fun a)
+eval values (Dadd (Dref x) a) = let fun = \y -> getValue x 0 values in Vfun (fun a)
 eval values (Dadd a b) = Vcons (eval values a) (eval values b)
---Paire (Value, (Value, Value)), if "first" then "second.first" else "second.second"
-eval values (Dmatch a b c) = Vcons(eval values a) (Vcons (eval values b) (eval values c))
+eval values (Dmatch a b c) = 
+  if eval values a
+  then eval values b
+  else eval values c
 eval values (Dfix [a] b) = Vcons (eval values a) (eval values b)
--- eval [] (Dfix ((Dnum _):_:_) (Dnum _)) = Vnum _
 eval _ _ = error "Malformed Dexp"
 
 getValue :: Int -> Int -> [Value] -> Value
